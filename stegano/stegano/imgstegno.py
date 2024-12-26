@@ -1,7 +1,9 @@
-from PIL import Image
+from PIL import Image  # Library untuk manipulasi gambar
 
+# Fungsi untuk membuat kamus substitusi dengan pergeseran berdasarkan kunci
 def create_shifted_substitution(key):
     """Membuat kamus substitusi yang digeser berdasarkan key."""
+    # Kamus substitusi dasar
     original_substitution = {
         'A': 'Batu', 'B': 'Lebah', 'C': 'Kaca', 'D': 'Lada', 'E': 'Lelah', 'F': 'Info',
         'G': 'Laga', 'H': 'Bahu', 'I': 'Diri', 'J': 'Baja', 'K': 'Luka', 'L': 'Pulau',
@@ -15,60 +17,59 @@ def create_shifted_substitution(key):
         'y': 'daya', 'z': 'azan'
     }
     
-    shifted_dict = {}
+    shifted_dict = {}  # Kamus baru untuk substitusi hasil geser
     for k in original_substitution:
-        if k.isupper():
-            # Untuk huruf besar
+        if k.isupper():  # Untuk huruf besar
             new_pos = chr((ord(k) - ord('A') + key) % 26 + ord('A'))
             shifted_dict[k] = original_substitution[new_pos]
-        else:
-            # Untuk huruf kecil
+        else:  # Untuk huruf kecil
             new_pos = chr((ord(k) - ord('a') + key) % 26 + ord('a'))
             shifted_dict[k] = original_substitution[new_pos]
     
     return shifted_dict
 
+# Fungsi untuk mengenkripsi pesan menggunakan substitusi
 def encrypt_message(message, key):
     """Mengenkripsi pesan menggunakan Caesar cipher dengan substitusi kustom."""
     substitution_dict = create_shifted_substitution(key)
     encrypted = []
     
     for char in message:
-        if char in substitution_dict:
+        if char in substitution_dict:  # Jika karakter ada dalam kamus substitusi
             encrypted.append(substitution_dict[char])
-        else:
+        else:  # Jika tidak ada, tambahkan karakter asli
             encrypted.append(char)
     
-    return ' '.join(encrypted)
+    return ' '.join(encrypted)  # Gabungkan hasil enkripsi dengan spasi
 
+# Fungsi untuk mendekripsi pesan
 def decrypt_message(encrypted_message, key):
     """Mendekripsi pesan yang dienkripsi."""
     substitution_dict = create_shifted_substitution(key)
-    # Buat dictionary terbalik untuk dekripsi
-    reverse_dict = {v: k for k, v in substitution_dict.items()}
+    reverse_dict = {v: k for k, v in substitution_dict.items()}  # Buat kamus terbalik
     
-    words = encrypted_message.split()
+    words = encrypted_message.split()  # Pisahkan pesan terenkripsi ke dalam kata
     decrypted = ''
     
     for word in words:
-        if word in reverse_dict:
+        if word in reverse_dict:  # Jika kata ditemukan di kamus terbalik
             decrypted += reverse_dict[word]
-        else:
+        else:  # Jika tidak, tambahkan kata asli
             decrypted += word
     
     return decrypted
 
+# Fungsi untuk menyembunyikan pesan dalam gambar menggunakan LSB
 def encode_image(image_name, message, output_image_name):
-    # Tambahkan marker di akhir pesan
+    # Tambahkan penanda akhir pesan
     message = message + "$$"
     
-    # Buka gambar dan pastikan dalam mode RGB
+    # Buka gambar dan konversi ke mode RGB
     image = Image.open(image_name).convert('RGB')
     
-    # Cek ekstensi output file
+    # Pastikan file output disimpan sebagai PNG
     output_ext = output_image_name.split('.')[-1].lower()
     if output_ext != 'png':
-        # Jika bukan PNG, ubah ke PNG
         output_image_name = output_image_name.rsplit('.', 1)[0] + '.png'
         print("Warning: Output file akan disimpan sebagai PNG untuk menghindari kehilangan data")
     
@@ -76,10 +77,11 @@ def encode_image(image_name, message, output_image_name):
     pixels = encoded_image.load()
     width, height = image.size
     
-    # Convert message ke binary
+    # Konversi pesan ke biner
     binary_message = ''.join(format(ord(char), '08b') for char in message)
     binary_length = len(binary_message)
     
+    # Cek apakah pesan terlalu panjang untuk gambar
     if binary_length > width * height * 3:
         raise ValueError("Pesan terlalu panjang untuk gambar ini")
     
@@ -88,31 +90,32 @@ def encode_image(image_name, message, output_image_name):
         for x in range(width):
             if idx < binary_length:
                 r, g, b = pixels[x, y]
-                if idx < binary_length:
+                if idx < binary_length:  # Modifikasi bit LSB pada kanal merah
                     r = (r & ~1) | int(binary_message[idx])
                     idx += 1
-                if idx < binary_length:
+                if idx < binary_length:  # Modifikasi bit LSB pada kanal hijau
                     g = (g & ~1) | int(binary_message[idx])
                     idx += 1
-                if idx < binary_length:
+                if idx < binary_length:  # Modifikasi bit LSB pada kanal biru
                     b = (b & ~1) | int(binary_message[idx])
                     idx += 1
                 pixels[x, y] = (r, g, b)
             else:
                 break
     
-    # Selalu simpan sebagai PNG untuk menghindari kompresi
+    # Simpan gambar hasil dengan format PNG
     encoded_image.save(output_image_name, 'PNG')
     return f"Pesan berhasil disembunyikan dalam file {output_image_name}"
 
+# Fungsi untuk membaca pesan tersembunyi dari gambar
 def decode_image(image_name):
-    # Buka gambar dan konversi ke RGB
+    # Buka gambar dan konversi ke mode RGB
     image = Image.open(image_name).convert('RGB')
     pixels = image.load()
     width, height = image.size
     
     binary_data = ""
-    # Baca bit LSB dari setiap channel RGB
+    # Ekstraksi bit LSB dari setiap piksel
     for y in range(height):
         for x in range(width):
             r, g, b = pixels[x, y]
@@ -120,22 +123,19 @@ def decode_image(image_name):
             binary_data += str(g & 1)
             binary_data += str(b & 1)
     
-    # Konversi binary ke ASCII
+    # Konversi data biner ke karakter ASCII
     decoded_data = ""
     for i in range(0, len(binary_data), 8):
         byte = binary_data[i:i+8]
-        if len(byte) == 8:  # Pastikan byte lengkap
-            try:
-                char = chr(int(byte, 2))
-                decoded_data += char
-                # Cek apakah kita menemukan marker akhir pesan
-                if decoded_data[-2:] == "$$":
-                    return decoded_data[:-2]  # Hapus marker $$
-            except:
-                break
+        if len(byte) == 8:
+            char = chr(int(byte, 2))
+            decoded_data += char
+            if decoded_data[-2:] == "$$":  # Cek penanda akhir pesan
+                return decoded_data[:-2]  # Hapus penanda
     
     return "Tidak ada pesan tersembunyi atau format tidak sesuai"
 
+# Fungsi utama untuk menjalankan program
 def main():
     while True:
         print("\nImage Steganography")
@@ -143,12 +143,12 @@ def main():
         print("2. Decode")
         choice = input("Masukkan pilihan Anda: ")
         
-        if choice == '1':
+        if choice == '1':  # Pilihan untuk encode
             image_name = input("Masukkan nama file gambar (dengan ekstensi): ")
             message = input("Masukkan pesan yang akan dienkripsi: ")
             key = int(input("Masukkan kunci pergeseran (angka): "))
             
-            # Enkripsi pesan
+            # Enkripsi pesan sebelum disembunyikan
             encrypted_message = encrypt_message(message, key)
             print("\n=== Hasil Enkripsi ===")
             print(f"Plain text: {message}")
@@ -163,12 +163,12 @@ def main():
             except Exception as e:
                 print(f"Error: {str(e)}")
         
-        elif choice == '2':
+        elif choice == '2':  # Pilihan untuk decode
             image_name = input("Masukkan nama file gambar (dengan ekstensi): ")
             cipher_text = input("Masukkan cipher text: ")
             key = int(input("Masukkan kunci pergeseran (angka): "))
             try:
-                # Langsung dekripsi dari cipher text yang dimasukkan
+                # Dekripsi pesan
                 decrypted_message = decrypt_message(cipher_text, key)
                 print("\n=== Hasil Dekripsi ===")
                 print(f"Cipher text: {cipher_text}")
@@ -184,4 +184,4 @@ def main():
             break
 
 if __name__ == "__main__":
-    main()
+    main()  # Jalankan fungsi utama
